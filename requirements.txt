@@ -1,0 +1,3 @@
+-r ./tc/requirements.txt
+ta
+pytest==6.2.2

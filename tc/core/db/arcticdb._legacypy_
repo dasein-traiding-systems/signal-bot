@@ -1,0 +1,68 @@
+import asyncio
+import logging
+from datetime import datetime
+from typing import Optional, Union
+from urllib.parse import quote_plus
+
+import pandas as pd
+from arctic import Arctic
+from arctic.store.version_store import VersionStore
+from arctic.date import DateRange
+
+from config import MONGO_DB_HOST, MONGO_DB_PASSWORD, MONGO_DB_USERNAME
+
+from core.exchange.common.mappers import symbol_to_binance
+from core.types import Singleton, Symbol, Tf
+from core.utils.data import candles_to_data_frame
+import logging
+
+CANDLES_TABLE_NAME = "candles"
+
+
+class ArcticDb(object, metaclass=Singleton):
+    def __init__(self, host: str = MONGO_DB_HOST, username: str = MONGO_DB_USERNAME,
+                 password: str = MONGO_DB_PASSWORD):
+        self.host = host
+        uri = "mongodb://%s:%s@%s" % (quote_plus(username), quote_plus(password), "localhost")
+
+        self.client = Arctic(uri)
+
+        self.client.initialize_library("vstore")
+        self.store: VersionStore = self.client["vstore"]
+        self.init_time = datetime.utcnow()
+
+    def save_candles(self, symbol: Symbol, tf: Tf, candles: pd.DataFrame):
+        symbol_str = symbol_to_binance(symbol)
+        logging.info(f"Save candles {symbol_str} {tf} - {len(candles)} {datetime.utcnow() - self.init_time}")
+
+        self.store.write(CANDLES_TABLE_NAME, candles, metadata={'symbol': symbol_str, 'tf': tf})
+
+    def load_candles(
+            self,
+            symbol: Symbol,
+            tf: Tf,
+            start_time: Optional[datetime] = None,
+            end_time: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        symbol_str = symbol_to_binance(symbol)
+        logging.info(f"Load candles {symbol_str} {tf} -  {datetime.utcnow() - self.init_time}")
+        data = self.store.read(CANDLES_TABLE_NAME, date_range=DateRange('2016-01-01', '2022-12-01')).data
+
+        return data
+        # if len(data) == 0:
+        #     return candles_to_data_frame([])
+
+        # del data["result"]
+        # del data["table"]
+        # data["_time"] = data["_time"].dt.tz_localize(None)
+        # return data.set_index("_time")
+
+    def load_last_candle_timestamp(self, symbol: Symbol, tf: Tf):
+        pass
+
+
+if __name__ == "__main__":
+    db = ArcticDb()
+    items = db.load_candles(("BTC","USDT"), Tf("1d"))
+    print(items)
+    pass

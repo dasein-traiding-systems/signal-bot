@@ -1,0 +1,4 @@
+-r ../../../requirements.txt
+chart-studio
+nbformat>=4.2.0
+dash==2.7.0

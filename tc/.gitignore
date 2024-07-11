@@ -1,0 +1,14 @@
+venv
+data
+logs
+.idea
+.idea/*
+secrets
+/tools/backtesting/.venv/
+__pycache__
+/node_modules/
+/yarn.lock
+/package.json
+/package-lock.json
+.env
+.env*

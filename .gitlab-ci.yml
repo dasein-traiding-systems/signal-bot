@@ -1,0 +1,42 @@
+variables:
+  CONTAINER_NAME: dtc-signal-bot
+  IMAGE_NAME: daseinji/signal-bot
+  IMAGE_TAG: latest
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - build
+  - deploy
+
+
+build_image:
+  stage: build
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $REGISTRY_USER -p $REGISTRY_PASS
+  script:
+    - echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" >> .env
+    - echo "MAIN_SERVER=$MAIN_SERVER" >> .env
+    - echo "LOGS_PATH=logs" >> .env
+    - echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
+    - echo "POSTGRES_USER=$POSTGRES_USER" >> .env
+    - echo "POSTGRES_DB_HOST=$POSTGRES_DB_HOST" >> .env
+    - cat .env
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+
+
+deploy:
+  stage: deploy
+  before_script:
+    - chmod 400 $SSH_KEY
+  script:
+    - ssh -o StrictHostKeyChecking=no -i $SSH_KEY root@$MAIN_SERVER "
+        docker login -u $REGISTRY_USER -p $REGISTRY_PASS &&
+        docker pull $IMAGE_NAME:$IMAGE_TAG && 
+        docker stop $CONTAINER_NAME || true && docker rm $CONTAINER_NAME || true && 
+        docker run -d --name=$CONTAINER_NAME $IMAGE_NAME:$IMAGE_TAG"
